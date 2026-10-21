@@ -58,72 +58,6 @@ header p{margin:0;font-size:.72rem}
 .round{flex:none;width:40px;height:40px;border-radius:50%;border:3px solid #fff;background:#fff;font-size:1.1rem;cursor:pointer;padding:0}
 #send{flex:none;border:3px solid #cdbffc;background:var(--p);color:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-weight:800;cursor:pointer}
 #kb{flex:none;padding:8px 5px;display:flex;flex-direction:column;gap:6px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
-.krow{display:flex;gap:5px;justify-content:center}
-.key{flex:1;min-width:0;height:42px;border:0;border-radius:12px;background:#fff;color:var(--ink);font:800 1.05rem "Dosis",system-ui,sans-serif;box-shadow:0 3px 0 #b9b4c6;padding:0;cursor:pointer}
-.key:active{transform:translateY(2px)}
-.key.fn{background:#cdbffc;color:#4a35b0;box-shadow:0 3px 0 #a897ee;flex:1.5}
-.key.on{background:var(--p);color:#fff;box-shadow:0 3px 0 #5a3fc0}
-.key.space{flex:5}
-.key.go{background:var(--p);color:#fff;box-shadow:0 3px 0 #5a3fc0;flex:1.6}
-.key.emo{font-size:1.35rem}
-</style>
-</head>
-<body>
-
-<section id="login">
-  <h1>our little inbox 💌</h1>
-  <p>just the two of us 🐰</p>
-  <input id="email" type="email" placeholder="email" autocomplete="username">
-  <input id="pass" type="password" placeholder="password" autocomplete="current-password">
-  <button class="btn" id="go">log in 💕</button>
-  <div id="err"></div>
-</section>
-
-<section id="chat" hidden>
-  <div class="screen">
-    <header>
-      <div><h1 id="who">💬</h1><p>our little inbox 💌</p></div>
-      <button id="out">log out</button>
-    </header>
-    <div class="check"></div>
-    <div id="note"></div>
-    <div id="msgs"><div class="empty">Loading… 💕</div></div>
-    <div id="chips"></div>
-    <div id="bar">
-      <button class="round" id="mode" aria-label="Switch keyboard">📱</button>
-      <input id="txt" type="text" placeholder="say something sweet…" maxlength="1000" autocomplete="off" readonly inputmode="none">
-      <button id="send">send 💌</button>
-    </div>
-  </div>
-  <div id="kb"></div>
-</section>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, updateDoc, doc, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBr0G91Elb9NzNz093InX5KXMPGKf7dnms",
-  authDomain: "inbox-deee3.firebaseapp.com",
-  projectId: "inbox-deee3",
-  storageBucket: "inbox-deee3.firebasestorage.app",
-  messagingSenderId: "544785445692",
-  appId: "1:544785445692:web:7a1752bed45fc5292ee439"
-};
-const ALLOWED = ["aero@gmail.com", "margaregg@gmail.com"];
-const HER = "margaregg@gmail.com"; // her bubbles are purple, everyone else is black/gray
-const QUICK = ["miss you 🥺", "thinking of you 💭", "good morning ☀️", "goodnight 🌙", "I love you 💖", "come cuddle 🧸"];
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const $ = id => document.getElementById(id);
-const txt = $("txt"), kb = $("kb");
-let me = null, unsub = null, cute = true, page = "abc", shift = false, rt, ri;
-const NICK = {"aero@gmail.com":"Aero", "margaregg@gmail.com":"Marce"};
-const nameOf = e => NICK[e] || (e || "").split("@")[0];
-
 function sprite(rows, pal){
   let r = "";
   rows.forEach((row, y) => { for(let x = 0; x < row.length; x++){ const c = pal[row[x]]; if(c) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`; } });
@@ -144,93 +78,60 @@ const CAT = sprite([
 const SPARK = sprite([
 "...X...","...X...","..XXX..","XXXWXXX","..XXX..","...X...","...X..."
 ], {X:"#b39dff", W:"#ffffff"});
-
-QUICK.forEach(t => {
-  const b = document.createElement("button");
-  b.className = "chip"; b.textContent = t; b.onclick = () => send(t);
-  $("chips").appendChild(b);
-});
-
-function note(t){ $("note").textContent = t; $("note").style.display = "block"; }
-
-function fmt(d){
-  const t = d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
-  return d.toDateString() === new Date().toDateString() ? t : d.toLocaleDateString([], {month:"short", day:"numeric"}) + " " + t;
-}
-
-function render(list){
-  const box = $("msgs");
-  const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 60;
-  box.textContent = "";
-  if(!list.length){
-    const e = document.createElement("div");
-    e.className = "empty"; e.textContent = "No messages yet — say hi to your love 💕";
-    box.appendChild(e); return;
-  }
-  list.forEach(m => {
-    const mine = m.from === me;
-    const row = document.createElement("div");
-    row.className = "row " + (mine ? "me" : "them") + (m.from === HER ? " her" : " him");
-    const tag = document.createElement("div");
-    tag.className = "tag";
-    tag.textContent = nameOf(m.from) + " " + (m.from === HER ? "💜" : "🖤") + (m.ts ? " · " + fmt(m.ts) : "");
-    const b = document.createElement("div");
-    b.className = "bubble"; b.textContent = m.text || "";
-    b.onclick = () => updateDoc(doc(db, "messages", m.id), { heart: !m.heart }).catch(() => {});
-    if(m.heart){
-      const h = document.createElement("span");
-      h.className = "heart"; h.textContent = "💖"; b.appendChild(h);
-    }
-    const col = document.createElement("div"); col.className = "col";
-    col.appendChild(tag); col.appendChild(b);
-    const av = document.createElement("div"); av.className = "av";
-    const im = document.createElement("img"); im.alt = ""; im.src = m.from === HER ? CAT : BUNNY; av.appendChild(im);
-    const sp = document.createElement("img"); sp.className = "spark"; sp.alt = ""; sp.src = SPARK; b.appendChild(sp);
-    row.appendChild(av); row.appendChild(col); box.appendChild(row);
-  });
-  if(stick) box.scrollTop = box.scrollHeight;
-}
-
-function send(text){
-  text = (text || "").trim();
-  if(!text || !me) return;
-  addDoc(collection(db, "messages"), { from: me, text, ts: serverTimestamp(), heart: false })
-    .catch(() => note("That message didn’t go through 🥺 — try again?"));
-  $("msgs").scrollTop = $("msgs").scrollHeight;
-}
-function submit(){ const v = txt.value; txt.value = ""; send(v); }
+const GHOST = sprite([
+"....OOOO....","..OOWWWWOO..",".OWWWWWWWWO.",".OWWWWWWWWO.",".OWKWWWWKWO.",".OWKWWWWKWO.",
+".OWPWWWWPWO.",".OWWWWWWWWO.",".OWWWWWWWWO.",".OWWWWWWWWO.",".OWWOWWOWWO.","..O..OO..O.."
+], {O:"#5a4a9a", W:"#ffffff", K:"#1b1a21", P:"#ff9ccb"});
+const BLOSSOM = sprite([
+"....PPPP....","...PPPPPP...",".PP.PPPP.PP.","PPPPPRRPPPPP","PPPPRYYRPPPP","PPPPRYYRPPPP",
+"PPPPPRRPPPPP",".PP.PPPP.PP.","...PPPPPP...","....PPPP...."
+], {P:"#ff8fb8", R:"#d6336c", Y:"#ffe08a"});
+const FLAME = sprite([
+".....R......",".....RR.....","....RRR.R...","...RRRRRR...","..RRROORRR..","..RROOOORR..",
+".RRROOOORRR.",".RROOYYOORR.",".RROYYYYORR.",".RROYYYYORR.","..RROOOORR..","...RRRRRR..."
+], {R:"#e8452c", O:"#ff9a3c", Y:"#ffd25e"});
+const HEART = sprite([
+"..RRR..RRR..",".RRRRRRRRRR.",".RPPRRRRRRR.",".RPRRRRRRRR.",".RRRRRRRRRR.",
+"..RRRRRRRR..","...RRRRRR...","....RRRR....",".....RR....."
+], {R:"#ff5c9a", P:"#ffd1e6"});
 $("send").onclick = submit;
 txt.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); submit(); } });
 
+/* ---- moods ---- */
+const MOODS = ["😴 sleepy","🥰 happy","🥺 need hugs","😭 sad","🔥 hyped","🍜 hungry","💤 busy","🎮 gaming"];
+MOODS.forEach(t => {
+  const b = document.createElement("button");
+  b.className = "chip"; b.textContent = t; b.onclick = () => { $("moodTxt").value = t; };
+  $("moodChips").appendChild(b);
+});
+function renderMoods(){
+  const box = $("moods"); box.textContent = "";
+  const mk = (email, own) => {
+    const b = document.createElement("button");
+    b.className = "mood " + (email === HER ? "her" : "him");
+    const t = moods[email];
+    b.textContent = (own ? "you" : nameOf(email)) + ": " + (t || (own ? "set your mood ✏️" : "—"));
+    if(own) b.onclick = () => { $("moodTxt").value = moods[me] || ""; $("moodEd").hidden = false; }; else b.disabled = true;
+    return b;
+  };
+  const other = ALLOWED.find(e => e !== me);
+  if(other) box.appendChild(mk(other, false));
+  if(me) box.appendChild(mk(me, true));
+}
+$("moodX").onclick = () => { $("moodEd").hidden = true; };
+$("moodSave").onclick = () => {
+  setDoc(doc(db, "moods", me), { text: $("moodTxt").value.trim().slice(0, 40), ts: serverTimestamp() })
+    .then(() => { $("moodEd").hidden = true; })
+    .catch(() => note("Couldn’t save your mood 🥺 — did the new rules get published?"));
+};
+
 /* ---- cute keyboard ---- */
-const L = {SHIFT:"⇧", BKSP:"⌫", NUM:"123", ABC:"abc", EMO:"😊", SPACE:"space", ENTER:"💌"};
-const CLS = {SHIFT:"fn", BKSP:"fn", NUM:"fn", ABC:"fn", EMO:"fn emo", SPACE:"space", ENTER:"go"};
+const L = {SHIFT:"⇧", BKSP:"⌫", NUM:"123", ABC:"abc", EMO:"😊", SPACE:"space", ENTER:"💌", STK:"🐱"};
+const CLS = {SHIFT:"fn", BKSP:"fn", NUM:"fn", ABC:"fn", EMO:"fn emo", STK:"fn emo", SPACE:"space", ENTER:"go"};
 const A = s => Array.from(s);
 
-function build(){
-  const rows = page === "abc"
-    ? [A("qwertyuiop"), A("asdfghjkl"), ["SHIFT", ...A("zxcvbnm"), "BKSP"], ["NUM","EMO",",","SPACE",".","ENTER"]]
-    : page === "num"
-    ? [A("1234567890"), A("-/:;()&@\"'"), [...A(".,?!~♡*"), "BKSP"], ["ABC","EMO","SPACE","ENTER"]]
-    : [A("💖💗💕💞🥰😘😍🥺"), A("😭😂🤭😴🤗😊🧸🐰"), A("🌸🎀✨⭐🌙🌈🍓🍰"), ["ABC","SPACE","BKSP","ENTER"]];
-  kb.textContent = "";
-  rows.forEach(r => {
-    const d = document.createElement("div"); d.className = "krow";
-    r.forEach(k => {
-      const b = document.createElement("button");
-      b.type = "button"; b.dataset.k = k;
-      b.className = "key " + (CLS[k] || (page === "emo" ? "emo" : "")) + (k === "SHIFT" && shift ? " on" : "");
-      b.textContent = L[k] || (page === "abc" && shift ? k.toUpperCase() : k);
-      d.appendChild(b);
-    });
-    kb.appendChild(d);
-  });
-}
-
-function press(k){
-  if(k === "BKSP"){ txt.value = A(txt.value).slice(0, -1).join(""); return; }
   if(k === "SHIFT"){ shift = !shift; build(); return; }
-  if(k === "NUM" || k === "ABC" || k === "EMO"){ page = k === "NUM" ? "num" : k === "EMO" ? "emo" : "abc"; build(); return; }
+  if(k === "NUM" || k === "ABC" || k === "EMO" || k === "STK"){ page = {NUM:"num", EMO:"emo", STK:"stk", ABC:"abc"}[k]; build(); return; }
   if(k === "ENTER"){ submit(); return; }
   if(k === "SPACE") k = " ";
   else if(page === "abc" && shift && /^[a-z]$/.test(k)){ k = k.toUpperCase(); shift = false; build(); }
@@ -272,6 +173,8 @@ $("out").onclick = () => signOut(auth);
 
 onAuthStateChanged(auth, user => {
   if(unsub){ unsub(); unsub = null; }
+  if(unsubM){ unsubM(); unsubM = null; }
+  seen = null; hearts = new Set(); moods = {};
   if(!user){
     me = null; $("chat").hidden = true; $("login").hidden = false; return;
   }
@@ -280,6 +183,10 @@ onAuthStateChanged(auth, user => {
   const other = ALLOWED.find(e => e !== me);
   $("who").textContent = "💬 " + (other ? nameOf(other) : "us");
   page = "abc"; shift = false; build(); setMode(true);
+  unsubM = onSnapshot(collection(db, "moods"), snap => {
+    moods = {}; snap.forEach(d => { moods[d.id] = d.data().text || ""; }); renderMoods();
+  }, () => {});
+  renderMoods();
   const q = query(collection(db, "messages"), orderBy("ts", "desc"), limit(200));
   unsub = onSnapshot(q, snap => {
     const list = snap.docs.map(d => {
@@ -292,3 +199,4 @@ onAuthStateChanged(auth, user => {
 </script>
 </body>
 </html>
+  
